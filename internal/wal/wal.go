@@ -7,24 +7,24 @@ import (
 	"time"
 )
 
-type wal struct {
+type Wal struct {
 	filepath string
 	logfile *os.File
 	mu sync.Mutex
 	lastRotatedTime time.Time
 }
 
-func NewWal(filepath string) (*wal, error) {
+func NewWal(filepath string) (*Wal, error) {
 	file, err := os.OpenFile(filepath, os.O_APPEND | os.O_WRONLY | os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	return &wal{filepath : filepath, logfile : file, lastRotatedTime : time.Now()}, nil
+	return &Wal{filepath : filepath, logfile : file, lastRotatedTime : time.Now()}, nil
 }
 
 
-func (w *wal)Write (content string) (error) {
+func (w *Wal)Write (content string) (error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -32,16 +32,17 @@ func (w *wal)Write (content string) (error) {
 	if err != nil {
 		return err
 	}
-
-	if info.Size() > 10 * 1024 * 1024 || time.Since(w.lastRotatedTime) > 2 * time.Minute {
+	
+	// Change this to 10 * 1024 * 1024 later 
+	if info.Size() > 5000 || time.Since(w.lastRotatedTime) > 2 * time.Minute {
 		// rotation logic goes here 
-		err := w.rotate()
+		err = w.rotate()
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err := w.logfile.WriteString(content + "\n")
+	_, err = w.logfile.WriteString(content + "\n")
 	if err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func (w *wal)Write (content string) (error) {
 	return nil
 }
 
-func (w *wal) rotate() error {
+func (w *Wal) rotate() error {
 	w.logfile.Close()
 
 	newName := fmt.Sprintf("%s.%d", w.filepath, time.Now().UnixNano())
