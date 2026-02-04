@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ParthK7/GoStash/internal/tailer"
 	"github.com/ParthK7/GoStash/internal/wal"
 )
 
@@ -22,7 +23,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, req *http.Request) {
 	}
 
 	body, err := io.ReadAll(req.Body)
-	defer req.Body.Close()
+	defer req.Body.Close() //Best practice -> important to close it to ensure that the socket is closed, telling the server its communicationn is done.
 	if err != nil || len(body) == 0 {
 		http.Error(w, "Could not read request body", http.StatusBadRequest)
 		return
@@ -47,6 +48,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize WAL: %v", err)
 	}
+
+	go func() {
+		err := tailer.WatchLog("storage/active.log")
+		if err != nil {
+			log.Printf("trailer error %v", err)
+		}
+	}()
 
 	myServer := Server{logger: logger}
 
