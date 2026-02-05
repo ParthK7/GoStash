@@ -66,6 +66,27 @@ func WatchLog(filename string) error {
 				}
 			}
 
+			if event.Has(fsnotify.Rename) || event.Has(fsnotify.Remove) {
+				fmt.Println("Log rotation detected.")
+
+				file.Close()
+
+				var newFile *os.File
+				for {
+					newFile, err = os.Open(filename)
+					if err == nil {
+						break
+					}
+				}
+
+				file = newFile
+				reader = bufio.NewReader(file)
+
+				watcher.Remove(event.Name)
+				watcher.Add(filename)
+
+			}
+
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return nil
