@@ -8,10 +8,13 @@ import (
 
 	"github.com/ParthK7/GoStash/internal/tailer"
 	"github.com/ParthK7/GoStash/internal/wal"
+	"github.com/gorilla/websocket"
 )
 
 type Server struct {
-	logger *wal.Wal
+	logger   *wal.Wal
+	hub      *Hub
+	upgrader websocket.Upgrader
 }
 
 func (s *Server) handleIngest(w http.ResponseWriter, req *http.Request) {
@@ -41,24 +44,56 @@ func (s *Server) handleIngest(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("Data logged successfully"))
 }
 
-func main() {
-	_ = os.MkdirAll("storage", 0755)
+func (s *Server) handleWs(w http.ResponseWriter, req *http.Request) {
+	connection, err := s.upgrader.Upgrade(w, req, nil)
+	if err != nil {
+		http.Error(w, "Could not upgrade HTTP connection", http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		s.hub.unregister <- connection
+		connection.Close()
+	}()
 
-	logger, err := wal.NewWal("storage/active.log")
+	s.hub.register <- connection
+	for {
+		_, _, err := connection.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+}
+
+func main() {
+	_ = os.MkdirAll("cmd/server/storage", 0755)
+
+	logger, err := wal.NewWal("cmd/server/storage/active.log")
 	if err != nil {
 		log.Fatalf("Failed to initialize WAL: %v", err)
 	}
 
+	logPipe := make(chan string)
+
+	hub := NewHub(logPipe)
+
+	// start the conumer first
+	go hub.Run()
+
 	go func() {
-		err := tailer.WatchLog("storage/active.log")
+		err := tailer.WatchLog("cmd/server/storage/active.log", logPipe)
 		if err != nil {
 			log.Printf("trailer error %v", err)
 		}
 	}()
 
-	myServer := Server{logger: logger}
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+
+	myServer := Server{logger: logger, hub: hub, upgrader: upgrader}
 
 	http.HandleFunc("/ingest", myServer.handleIngest)
+	http.HandleFunc("/ws", myServer.handleWs)
 
 	http.ListenAndServe(":8080", nil)
 
