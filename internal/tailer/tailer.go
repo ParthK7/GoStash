@@ -9,7 +9,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func WatchLog(filename string) error {
+func WatchLog(filename string, logchan chan string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("Error initialzing watcher: %w \n", err)
@@ -54,6 +54,7 @@ func WatchLog(filename string) error {
 
 					if len(line) > 0 {
 						fmt.Printf("New log line: %s", line)
+						logchan <- line
 					}
 
 					if err != nil {
