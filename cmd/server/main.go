@@ -94,6 +94,9 @@ func main() {
 
 	http.HandleFunc("/ingest", myServer.handleIngest)
 	http.HandleFunc("/ws", myServer.handleWs)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "index.html")
+	})
 
 	http.ListenAndServe(":8080", nil)
 
