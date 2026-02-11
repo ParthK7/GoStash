@@ -76,7 +76,7 @@ func main() {
 
 	hub := NewHub(logPipe)
 
-	// start the conumer first
+	// start the consumer first
 	go hub.Run()
 
 	go func() {
